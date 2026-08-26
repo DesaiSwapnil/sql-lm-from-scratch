@@ -1,0 +1,18 @@
+{
+  "vocab_size": 100352,
+  "context_length": 1024,
+  "n_embed": 768,
+  "n_head": 12,
+  "n_blocks": 24,
+  "swiglu_hidden": 2048,
+  "device": "cuda",
+  "amp_dtype": "bf16",
+  "seed": 1337,
+  "compile": false,
+  "grad_checkpointing": false,
+  "ckpt_dir": "/content/ckpts",
+  "drive_ckpt_dir": "/content/drive/MyDrive/llm_ckpts",
+  "log_dir": "/content/logs",
+  "use_wandb": false,
+  "wandb_project": "sql-lm"
+}

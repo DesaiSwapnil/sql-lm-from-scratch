@@ -1,0 +1,15 @@
+{
+  "vocab_size": 512,
+  "context_length": 64,
+  "n_embed": 128,
+  "n_head": 4,
+  "n_blocks": 2,
+  "swiglu_hidden": 341,
+  "device": "cpu",
+  "amp_dtype": null,
+  "compile": false,
+  "grad_checkpointing": false,
+  "drive_ckpt_dir": "",
+  "ckpt_dir": "/tmp/sql_lm_smoke",
+  "log_dir": "/tmp/sql_lm_smoke/logs"
+}

@@ -1,0 +1,12 @@
+{
+  "iterations": 5,
+  "prompts_per_iter": 2,
+  "group_size": 2,
+  "rollout_len": 32,
+  "eval_every": 10000,
+  "save_every": 10000,
+  "sft_ckpt": "/tmp/sql_lm_smoke/sft.pt",
+  "prompt_path": "/tmp/sql_lm_smoke/sql_prompts_train.jsonl",
+  "eval_prompt_path": "/tmp/sql_lm_smoke/sql_prompts_dev.jsonl",
+  "out_ckpt": "/tmp/sql_lm_smoke/grpo.pt"
+}

@@ -1,0 +1,19 @@
+{
+  "sft_ckpt": "/content/ckpts/sft.pt",
+  "prompt_path": "/content/data/sql_prompts_train.jsonl",
+  "eval_prompt_path": "/content/data/sql_prompts_dev.jsonl",
+  "out_ckpt": "/content/ckpts/grpo.pt",
+  "iterations": 2000,
+  "prompts_per_iter": 8,
+  "group_size": 8,
+  "rollout_len": 512,
+  "temperature": 1.0,
+  "top_p": 1.0,
+  "grpo_epochs": 1,
+  "clip": 0.2,
+  "kl_coef": 0.04,
+  "lr": 1e-6,
+  "grad_clip": 1.0,
+  "eval_every": 100,
+  "save_every": 200
+}

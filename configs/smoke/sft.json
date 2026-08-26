@@ -1,0 +1,13 @@
+{
+  "batch_size": 2,
+  "grad_accum": 1,
+  "epochs": 1,
+  "max_steps": 10,
+  "eval_steps": 10000,
+  "warmup_steps": 2,
+  "save_every": 10000,
+  "pretrained_ckpt": "/tmp/sql_lm_smoke/pretrain.pt",
+  "train_path": "/tmp/sql_lm_smoke/sft_train.h5",
+  "dev_path": "/tmp/sql_lm_smoke/sft_dev.h5",
+  "out_ckpt": "/tmp/sql_lm_smoke/sft.pt"
+}

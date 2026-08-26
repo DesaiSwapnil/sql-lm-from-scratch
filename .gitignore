@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+*.pt
+*.h5
+*.hdf5
+*.egg-info/
+.eggs/
+dist/
+build/
+.env
+*.log
+# data files (too large for git)
+data/
+/content/
+# HuggingFace cache
+hf_cache/
+# Drive mount (Colab only)
+drive/
+# editor / OS / tooling
+.DS_Store
+.vscode/
+.idea/
+.claude/
+# ref repo is checked in for dev reference only, exclude from linting etc.
+_ref_repo/

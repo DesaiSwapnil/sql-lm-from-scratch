@@ -1,0 +1,17 @@
+{
+  "pretrained_ckpt": "/content/ckpts/pretrain.pt",
+  "train_path": "/content/data/sft_train.h5",
+  "dev_path": "/content/data/sft_dev.h5",
+  "out_ckpt": "/content/ckpts/sft.pt",
+  "batch_size": 8,
+  "grad_accum": 4,
+  "epochs": 3,
+  "max_steps": -1,
+  "eval_steps": 200,
+  "warmup_steps": 100,
+  "lr": 1e-5,
+  "min_lr": 1e-6,
+  "weight_decay": 0.0,
+  "grad_clip": 1.0,
+  "save_every": 500
+}

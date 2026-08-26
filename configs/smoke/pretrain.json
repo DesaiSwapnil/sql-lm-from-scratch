@@ -1,0 +1,12 @@
+{
+  "batch_size": 2,
+  "grad_accum": 1,
+  "train_steps": 20,
+  "eval_steps": 10000,
+  "eval_iters": 2,
+  "warmup_steps": 2,
+  "save_every": 10,
+  "train_path": "/tmp/sql_lm_smoke/pretrain_train.h5",
+  "dev_path": "/tmp/sql_lm_smoke/pretrain_dev.h5",
+  "out_ckpt": "/tmp/sql_lm_smoke/pretrain.pt"
+}
