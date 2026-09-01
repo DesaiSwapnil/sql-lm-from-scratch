@@ -43,6 +43,8 @@ from src.post_training.optim import configure_optimizer, cosine_lr
 from src.post_training.utils import (
     amp_autocast,
     build_model_from_config,
+    make_grad_scaler,
+    resolve_amp_dtype,
     save_stage_ckpt,
     set_seed,
     unwrap,
@@ -79,7 +81,11 @@ def _apply_cli_overrides(cfg: PretrainConfig, extras: list[str]) -> PretrainConf
             if key not in field_map:
                 print(f"[cli] ignoring unknown flag --{key}")
                 continue
-            field_type = type(getattr(cfg, key))
+            current = getattr(cfg, key)
+            field_type = type(current) if current is not None else str
+            # Dataclass Optional[str] is NoneType when unset; treat as str.
+            if key == "amp_dtype":
+                field_type = str
             if field_type is bool:
                 overrides[key] = val_str.lower() not in ("false", "0", "no")
             elif field_type in (int, float, str):
@@ -151,10 +157,28 @@ def main() -> None:
     # DDP / device setup.
     ctx = ddp_setup(cfg.device)
     set_seed(cfg.seed + ctx.rank)
+    object.__setattr__(cfg, "amp_dtype", resolve_amp_dtype(cfg.amp_dtype, ctx.device))
 
     if ctx.is_main:
         os.makedirs(cfg.ckpt_dir, exist_ok=True)
         os.makedirs(cfg.log_dir, exist_ok=True)
+        if ctx.device.startswith("cuda") and torch.cuda.is_available():
+            free, total = torch.cuda.mem_get_info()
+            print(
+                f"[gpu] {torch.cuda.get_device_name(0)} | "
+                f"{total / 1024**3:.1f} GB total, {free / 1024**3:.1f} GB free"
+            )
+        else:
+            print(f"[gpu] device={ctx.device} | CUDA unavailable")
+        print(
+            f"[amp] resolved={cfg.amp_dtype!r} | "
+            f"scaler={cfg.amp_dtype == 'fp16'}"
+        )
+        print(
+            f"[grad_checkpointing] {cfg.grad_checkpointing} | "
+            f"batch_size={cfg.batch_size} grad_accum={cfg.grad_accum} "
+            f"(effective {cfg.batch_size * cfg.grad_accum})"
+        )
 
     # Build model.
     model = build_model_from_config(cfg).to(ctx.device)
@@ -201,7 +225,7 @@ def main() -> None:
     ) if ctx.is_main else None
 
     ac = amp_autocast(cfg.amp_dtype, ctx.device)
-    scaler = torch.amp.GradScaler("cuda", enabled=False)  # bf16 doesn't need scaler
+    scaler = make_grad_scaler(cfg.amp_dtype, ctx.device)
 
     model.train()
     t0 = time.perf_counter()
@@ -229,15 +253,16 @@ def main() -> None:
             with sync_ctx:
                 with ac:
                     _, loss = model(xb, targets=yb)
-                loss_scaled = loss / cfg.grad_accum
-                loss_scaled.backward()
+                scaler.scale(loss / cfg.grad_accum).backward()
             accum_loss += loss.item() / cfg.grad_accum
 
         tokens_seen += cfg.grad_accum * cfg.batch_size * cfg.context_length * ctx.world_size
 
         if cfg.grad_clip > 0:
+            scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
-        optimizer.step()
+        scaler.step(optimizer)
+        scaler.update()
 
         # Logging (main rank only).
         if ctx.is_main:

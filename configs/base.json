@@ -6,7 +6,7 @@
   "n_blocks": 24,
   "swiglu_hidden": 2048,
   "device": "cuda",
-  "amp_dtype": "bf16",
+  "amp_dtype": "auto",
   "seed": 1337,
   "compile": false,
   "grad_checkpointing": false,

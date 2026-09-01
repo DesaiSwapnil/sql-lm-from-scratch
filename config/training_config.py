@@ -31,10 +31,10 @@ class BaseModelConfig:
 
     # Runtime.
     device: str = "cuda"
-    amp_dtype: str | None = "bf16"
+    amp_dtype: str | None = "auto"  # auto → bf16 on Ampere+, fp16+GradScaler on T4
     seed: int = 1337
     compile: bool = False          # torch.compile: large speedup, slow first step
-    grad_checkpointing: bool = False  # trade compute for VRAM (useful on V100/L4)
+    grad_checkpointing: bool = False  # stage configs should enable this for T4 16GB
 
     # Paths.
     ckpt_dir: str = _CKPT
@@ -50,10 +50,11 @@ class BaseModelConfig:
 class PretrainConfig(BaseModelConfig):
     train_path: str = f"{_DATA}/pretrain_train.h5"
     dev_path: str = f"{_DATA}/pretrain_dev.h5"
-    # A100 40GB: batch 16 × accum 8 = 128 seqs × 1024 tokens = 131072 tokens/step.
-    # 20k steps × 131k tokens/step ≈ 2.6B tokens — fits the 1.5–3B session budget.
-    batch_size: int = 16
-    grad_accum: int = 8
+    # T4 16GB-safe microbatch. Effective batch stays 128 (4 × 32).
+    # A100 40GB can raise batch_size and drop grad_accum proportionally (e.g. 16 × 8).
+    # Logits are (B, T, 100352) — this, not attention, is the T4 OOM cliff.
+    batch_size: int = 4
+    grad_accum: int = 32
     train_steps: int = 20_000
     eval_steps: int = 1_000
     eval_iters: int = 100

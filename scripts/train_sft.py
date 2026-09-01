@@ -40,6 +40,7 @@ from src.post_training.optim import configure_optimizer, cosine_lr
 from src.post_training.utils import (
     amp_autocast,
     load_backbone_from_ckpt,
+    make_grad_scaler,
     save_stage_ckpt,
     set_seed,
     unwrap,
@@ -218,6 +219,7 @@ def main() -> None:
     ) if ctx.is_main else None
 
     ac = amp_autocast(cfg.amp_dtype, ctx.device)
+    scaler = make_grad_scaler(cfg.amp_dtype, ctx.device)
     model.train()
     t0 = time.perf_counter()
 
@@ -258,14 +260,16 @@ def main() -> None:
                 if loss is None:
                     micro_count += 1
                     continue
-                (loss / cfg.grad_accum).backward()
+                scaler.scale(loss / cfg.grad_accum).backward()
             micro_buf_loss += loss.item() / cfg.grad_accum
             micro_count    += 1
 
             if is_last_micro:
                 if cfg.grad_clip > 0:
+                    scaler.unscale_(optimizer)
                     torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
-                optimizer.step()
+                scaler.step(optimizer)
+                scaler.update()
                 global_step  += 1
                 accum_loss    = micro_buf_loss
                 micro_buf_loss = 0.0

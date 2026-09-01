@@ -22,11 +22,80 @@ import torch
 import torch.nn as nn
 
 
+_AMP_RESOLVE_LOGGED = False
+
+
+def resolve_amp_dtype(amp_dtype: str | None, device: str) -> str | None:
+    """Map a requested AMP dtype to what this GPU can actually run.
+
+    Returns ``"bf16"``, ``"fp16"``, or ``None`` (AMP off).
+
+    Turing GPUs (T4, compute 7.5) have no native bf16 tensor cores.
+    ``torch.cuda.is_bf16_supported()`` is False there; requesting bf16 would
+    still construct a bfloat16 autocast, but matmuls are emulated and some
+    kernels are unreliable. We fall back to fp16, which needs a GradScaler.
+    Ampere+ (A100, L4) keep bf16 and skip the scaler.
+    """
+    global _AMP_RESOLVE_LOGGED
+    raw = amp_dtype
+    requested = (amp_dtype or "").strip().lower() or None
+    if requested in (None, "none", "off", "fp32"):
+        return None
+
+    cuda = str(device).startswith("cuda") and torch.cuda.is_available()
+    if not cuda:
+        if requested in ("bf16", "fp16", "auto") and not _AMP_RESOLVE_LOGGED:
+            print(f"[amp] CUDA not available; disabling AMP (requested {raw!r})")
+            _AMP_RESOLVE_LOGGED = True
+        return None
+
+    bf16_ok = torch.cuda.is_bf16_supported()
+    gpu = torch.cuda.get_device_name(0) if torch.cuda.device_count() else device
+
+    if requested == "auto":
+        chosen = "bf16" if bf16_ok else "fp16"
+    elif requested == "bf16":
+        if bf16_ok:
+            chosen = "bf16"
+        else:
+            chosen = "fp16"
+            if not _AMP_RESOLVE_LOGGED:
+                print(
+                    f"[amp] bf16 requested but not natively supported on {gpu} "
+                    f"(compute capability < 8.0); falling back to fp16 + GradScaler"
+                )
+                _AMP_RESOLVE_LOGGED = True
+    elif requested == "fp16":
+        chosen = "fp16"
+    else:
+        raise ValueError(
+            f"Unknown amp_dtype {amp_dtype!r}; expected bf16, fp16, auto, or none"
+        )
+
+    if not _AMP_RESOLVE_LOGGED:
+        cap = torch.cuda.get_device_capability(0)
+        print(
+            f"[amp] using {chosen} on {gpu} (cc {cap[0]}.{cap[1]}, "
+            f"bf16_supported={bf16_ok}, requested={raw!r})"
+        )
+        _AMP_RESOLVE_LOGGED = True
+    return chosen
+
+
 def amp_autocast(amp_dtype: str | None, device: str):
-    """Return a bf16 autocast context on CUDA when requested, else a no-op context."""
-    if amp_dtype == "bf16" and str(device).startswith("cuda") and torch.cuda.is_available():
+    """Autocast context for the resolved AMP dtype (bf16, fp16, or no-op)."""
+    resolved = resolve_amp_dtype(amp_dtype, device)
+    if resolved == "bf16":
         return torch.autocast(device_type="cuda", dtype=torch.bfloat16)
+    if resolved == "fp16":
+        return torch.autocast(device_type="cuda", dtype=torch.float16)
     return contextlib.nullcontext()
+
+
+def make_grad_scaler(amp_dtype: str | None, device: str) -> torch.amp.GradScaler:
+    """GradScaler is required for fp16 AMP; bf16 and fp32 skip it."""
+    enabled = resolve_amp_dtype(amp_dtype, device) == "fp16"
+    return torch.amp.GradScaler("cuda", enabled=enabled)
 
 
 def set_seed(seed: int) -> None:
