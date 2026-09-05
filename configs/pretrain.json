@@ -1,10 +1,10 @@
 {
   "train_path": "/content/data/pretrain_train.h5",
   "dev_path": "/content/data/pretrain_dev.h5",
-  "batch_size": 4,
-  "grad_accum": 32,
+  "batch_size": 32,
+  "grad_accum": 4,
   "amp_dtype": "auto",
-  "grad_checkpointing": true,
+  "grad_checkpointing": false,
   "train_steps": 20000,
   "eval_steps": 1000,
   "eval_iters": 100,

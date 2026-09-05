@@ -50,11 +50,11 @@ class BaseModelConfig:
 class PretrainConfig(BaseModelConfig):
     train_path: str = f"{_DATA}/pretrain_train.h5"
     dev_path: str = f"{_DATA}/pretrain_dev.h5"
-    # T4 16GB-safe microbatch. Effective batch stays 128 (4 × 32).
-    # A100 40GB can raise batch_size and drop grad_accum proportionally (e.g. 16 × 8).
-    # Logits are (B, T, 100352) — this, not attention, is the T4 OOM cliff.
-    batch_size: int = 4
-    grad_accum: int = 32
+    # A100 80GB: batch 32 × accum 4 = 128 seqs × 1024 tokens = 131072 tokens/step.
+    # Checkpointing off — 80GB has headroom; recompute would only slow the step.
+    # Logits (B, T, 100352) still dominate VRAM; B=64 is the next step if peak <~45GB.
+    batch_size: int = 32
+    grad_accum: int = 4
     train_steps: int = 20_000
     eval_steps: int = 1_000
     eval_iters: int = 100
