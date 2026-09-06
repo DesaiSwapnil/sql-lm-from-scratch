@@ -124,31 +124,48 @@ def _iter_dolly(hf_cache: str) -> Iterator[tuple[str, str]]:
         yield user, response
 
 
-def _iter_spider(hf_cache: str) -> Iterator[tuple[str, str]]:
-    from datasets import load_dataset
-    try:
-        ds = load_dataset("spider", split="train", cache_dir=hf_cache, trust_remote_code=True)
-    except Exception as e:
-        print(f"[spider] skipping ({e})")
+def _iter_spider(hf_cache: str, spider_dir: str = "/content/data/spider") -> Iterator[tuple[str, str]]:
+    """Read Spider directly from the locally extracted files (no HF datasets library,
+    since HF no longer supports trust_remote_code for loading-script datasets)."""
+    import json
+
+    train_json = os.path.join(spider_dir, "train_spider.json")
+    if not os.path.exists(train_json):
+        print(f"[spider] skipping (not found at {train_json!r} — extract spider.zip first)")
         return
-    for ex in ds:
+
+    with open(train_json) as f:
+        examples = json.load(f)
+
+    for ex in examples:
         question = ex.get("question", "").strip()
-        gold_sql = ex.get("query",    "").strip()
-        db_id    = ex.get("db_id",    "")
+        gold_sql = ex.get("query", "").strip()
+        db_id    = ex.get("db_id", "")
         if not question or not gold_sql:
             continue
         user, asst = _sql_turn(question, f"Database: {db_id}", gold_sql)
         yield user, asst
 
 
-def _iter_bird(hf_cache: str) -> Iterator[tuple[str, str]]:
-    from datasets import load_dataset
-    try:
-        ds = load_dataset("birdbench/bird", split="train", cache_dir=hf_cache, trust_remote_code=True)
-    except Exception as e:
-        print(f"[bird] skipping ({e})")
+def _iter_bird(hf_cache: str, bird_dir: str = "/content/data/bird") -> Iterator[tuple[str, str]]:
+    """BIRD has no reliable trust_remote_code-free HF path as of this writing.
+    Reads from a locally provided train.json if present (same shape as Spider's),
+    otherwise skips with instructions rather than failing the whole run."""
+    import json
+
+    train_json = os.path.join(bird_dir, "train.json")
+    if not os.path.exists(train_json):
+        print(
+            f"[bird] skipping — no local BIRD data at {train_json!r}. "
+            f"Download BIRD manually from https://bird-bench.github.io/ "
+            f"and place train.json (with question/SQL/db_id fields) at that path."
+        )
         return
-    for ex in ds:
+
+    with open(train_json) as f:
+        examples = json.load(f)
+
+    for ex in examples:
         question = ex.get("question", "").strip()
         gold_sql = ex.get("SQL", ex.get("query", "")).strip()
         db_id    = ex.get("db_id", "")
@@ -230,7 +247,7 @@ def main() -> None:
     for name, iterator in [
         ("alpaca", _iter_alpaca(args.hf_cache)),
         ("dolly",  _iter_dolly(args.hf_cache)),
-        ("spider", _iter_spider(args.hf_cache)),
+        ("spider", _iter_spider(args.hf_cache, spider_dir=os.path.join(args.out_dir, "spider"))),
         ("bird",   _iter_bird(args.hf_cache)),
     ]:
         print(f"Collecting {name} …")
