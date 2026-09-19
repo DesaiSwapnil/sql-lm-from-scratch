@@ -1,0 +1,23 @@
+{
+  "pretrain.pt": {
+    "ex_accuracy": 0.0,
+    "format_rate": 0.0,
+    "valid_rate": 0.0,
+    "mean_reward": 0.0,
+    "n_examples": 1034
+  },
+  "sft.pt": {
+    "ex_accuracy": 0.0,
+    "format_rate": 0.0038684719535783366,
+    "valid_rate": 0.0,
+    "mean_reward": 0.0003868471953578337,
+    "n_examples": 1034
+  },
+  "grpo.pt": {
+    "ex_accuracy": 0.010638297872340425,
+    "format_rate": 0.995164410058027,
+    "valid_rate": 0.995164410058027,
+    "mean_reward": 0.3059961315280464,
+    "n_examples": 1034
+  }
+}
