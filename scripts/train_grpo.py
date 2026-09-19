@@ -202,6 +202,7 @@ def evaluate(
         unwrap(model), prompt_ids_list, cfg.rollout_len, ctx.device,
         temperature=cfg.temperature,
         top_p=cfg.top_p if cfg.top_p < 1.0 else None,
+        context_length=unwrap(model).context_length,
     )
     rewards = _score_rewards(seqs, prompt_lens, eval_prompts)
     mean_r  = reduce_scalar(rewards.mean().item(), ctx)
@@ -317,11 +318,12 @@ def main() -> None:
         prompt_ids_list = [_prompt_ids(p) for p in all_dicts]
         model.eval()
         with torch.no_grad():
-            seqs, response_mask, prompt_lens = rollout_prompts(
+          seqs, response_mask, prompt_lens = rollout_prompts(
                 unwrap(model), prompt_ids_list, cfg.rollout_len, ctx.device,
                 temperature=cfg.temperature,
                 top_p=cfg.top_p if cfg.top_p < 1.0 else None,
                 group_size=G,
+                context_length=unwrap(model).context_length,
             )
 
         # ── 3. Reward scoring ──────────────────────────────────────────────

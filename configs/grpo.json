@@ -4,7 +4,7 @@
   "eval_prompt_path": "/content/data/sql_prompts_dev.jsonl",
   "out_ckpt": "/content/ckpts/grpo.pt",
   "iterations": 2000,
-  "prompts_per_iter": 8,
+  "prompts_per_iter": 2,
   "group_size": 8,
   "rollout_len": 512,
   "temperature": 1.0,

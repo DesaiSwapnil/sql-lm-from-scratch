@@ -11,6 +11,8 @@ Key additions vs. reference:
     sequential.  Across-group (P groups) remains sequential — no cross-group
     padding required since each group shares the same prompt.
   - Batched logprob computation for all N sequences simultaneously.
+  - Prompt-length capping: max_new_tokens is clamped so prompt_len + generated_len
+    never exceeds context_length (prevents RoPE index errors on long schemas).
 """
 
 from __future__ import annotations
@@ -142,6 +144,7 @@ def rollout_prompts(
     temperature: float = 1.0,
     top_p: float | None = None,
     group_size: int = 1,
+    context_length: int | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Sample one completion per prompt.
@@ -151,13 +154,17 @@ def rollout_prompts(
         prompts:        list of N prompt token-id lists.  When group_size > 1,
                         N must equal P × group_size, and consecutive group_size
                         entries must be identical (same prompt repeated).
-        max_new_tokens: max new tokens to generate per completion.
+        max_new_tokens: max new tokens to generate per completion (soft cap —
+                        clamped per-prompt so prompt_len + generated_len never
+                        exceeds context_length).
         device:         torch device string.
         temperature:    sampling temperature.
         top_p:          nucleus sampling cutoff, or None.
         group_size:     when > 1, completions within each group of identical prompts
                         are generated in a single batched forward pass (G× faster
                         than sequential on GPU without any cross-prompt padding).
+        context_length: model's max sequence length. Defaults to
+                        unwrap(model).context_length if not given.
 
     Returns:
         seqs:          (N, T_max) int64 — right-padded with PAD_ID.
@@ -165,6 +172,7 @@ def rollout_prompts(
         prompt_lens:   (N,) int64       — prompt length for each sequence.
     """
     model.eval()
+    ctx_len = context_length or unwrap(model).context_length
     sequences:   list[torch.Tensor] = []
     prompt_lens: list[int]          = []
 
@@ -174,14 +182,26 @@ def rollout_prompts(
         P = len(prompts) // group_size
         for p_idx in range(P):
             group_prompt = prompts[p_idx * group_size]  # all G copies are identical
+            plen = len(group_prompt)
+            if plen >= ctx_len - 1:
+                print(f"[rollout] WARNING: prompt_len={plen} >= context_length={ctx_len} — truncating prompt.")
+                group_prompt = group_prompt[-(ctx_len - 8):]
+                plen = len(group_prompt)
+            eff_max_new = max(1, min(max_new_tokens, ctx_len - plen - 1))
             group_seqs   = _generate_group(model, group_prompt, group_size,
-                                           max_new_tokens, device, temperature, top_p)
+                                           eff_max_new, device, temperature, top_p)
             sequences.extend(group_seqs)
-            prompt_lens.extend([len(group_prompt)] * group_size)
+            prompt_lens.extend([plen] * group_size)
     else:
         for toks in prompts:
-            sequences.append(_generate_one(model, toks, max_new_tokens, device, temperature, top_p))
-            prompt_lens.append(len(toks))
+            plen = len(toks)
+            if plen >= ctx_len - 1:
+                print(f"[rollout] WARNING: prompt_len={plen} >= context_length={ctx_len} — truncating prompt.")
+                toks = toks[-(ctx_len - 8):]
+                plen = len(toks)
+            eff_max_new = max(1, min(max_new_tokens, ctx_len - plen - 1))
+            sequences.append(_generate_one(model, toks, eff_max_new, device, temperature, top_p))
+            prompt_lens.append(plen)
 
     # Right-pad all sequences to the same length.
     T_max = max(s.shape[0] for s in sequences)
