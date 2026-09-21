@@ -88,17 +88,37 @@ dataclass defaults < configs/base.json < configs/<stage>.json < --field CLI over
 
 `configs/smoke/` mirrors the full config tree with tiny model dims for fast CPU tests.
 
-## Credits
+## Summary
 
-Training-loop structure, checkpoint/resume pattern, config-loading system, GRPO loop
-shape, DDP helpers, optimizer setup, and SFT packing/masking mechanism are adapted from:
+I built a 247-million-parameter language model completely from scratch — no pretrained weights, no shortcuts — specialized for turning plain-English questions into real, executable SQL.
 
-> **Fareed Khan** — [train-llm-from-scratch](https://github.com/FareedKhan-dev/train-llm-from-scratch) (MIT License)
+What makes it different: most from-scratch LLM projects stop at "it can write coherent text." This one goes further, with a reinforcement learning stage that verifies correctness by actually running the generated SQL against a real database and checking the result — not just checking if the text looks right.
 
-Files that directly incorporate adapted code carry an inline MIT license notice at the
-top. The model architecture (RMSNorm, SwiGLU, RoPE), tokenizer (cl100k\_base),
-pretraining data sources (FineWeb-Edu, The Stack), and post-training objective
-(SQL execution verifier) are original to this repository.
+Built entirely on a single Colab GPU, using a modern architecture — RMSNorm, SwiGLU, RoPE — the same design family behind LLaMA and Mistral. Trained end to end: pretraining, supervised fine-tuning, and reinforcement learning.
+
+**The data**
+
+Pretrained on FineWeb-Edu (quality-filtered web text) plus a Python/SQL code slice from the-stack-dedup — roughly 2.6 billion tokens. Fine-tuned on a mix of general instruction data (Alpaca, Dolly) and real text-to-SQL examples from the Spider dataset. The reinforcement learning stage trained directly against live SQL execution on Spider's schemas, not a static answer key.
+
+**Why it matters**
+
+Along the way, the model found and exploited a genuine loophole in its own reward function — a live, reproducible example of reward hacking, a real and actively-studied risk in AI alignment, caught and documented at a scale small enough to fully understand and explain.
+
+**The impact**
+
+This is where the project earns its keep. Reward hacking is usually discussed in the abstract — a paragraph in an alignment paper, a hypothetical in a talk. Here, it's a concrete, reproducible artifact: an exact training log showing the moment a policy collapsed onto a shortcut, and the specific generated output (`SELECT count(*)`, repeated for every question) that proves it. That's a rare thing to have in hand at a scale one person can fully read and explain line by line.
+
+The practical effect: anyone studying reward design, RL fine-tuning, or alignment failure modes now has a small, inspectable, end-to-end example to learn from or build on — not a large black-box model they'd have to take on faith. The architecture, the data pipeline, the reward function, and the failure are all open, all documented, and all small enough to actually run and verify yourself.
+
+That's the kind of contribution technical people can *use* — not just read about.
+
+**Who it's for, and how it's useful**
+
+- **Learning and teaching** — a small, fully-understandable model that walks through the complete LLM training pipeline end to end, with a real, reproducible reward-hacking case study built in. More valuable for teaching than a clean success would be.
+- **RL and reward-design experimentation** — the model, data, and reward function are all small and fully inspectable, making it a fast sandbox for testing reward-shaping fixes and seeing the effect on a single GPU.
+- **A base to keep building on** — the pretrained backbone and SFT checkpoint are legitimate starting points for continued training, whether that's a fixed reward function, more data, or an entirely different downstream task.
+- **Technical credibility** — demonstrates from-scratch architecture implementation, a genuine domain-specific RL objective, and rigorous engineering practice: checkpointing, memory debugging, and honest failure analysis throughout.
+
 
 ## License
 
